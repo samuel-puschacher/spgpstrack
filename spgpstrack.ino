@@ -179,7 +179,7 @@ void print(String s)
 {
   #ifdef SOFT_SERIAL
   Serial.print(s);
-  #else 
+  #else
     #ifdef DEBUG
       ds.print(s);
     #endif
@@ -197,10 +197,10 @@ void setup() {
     #endif
     println(F("Starting"));
     pinMode(buzzer, OUTPUT);
-    
+
     print(F("TinyGPS++ library v. ")); println(TinyGPSPlus::libraryVersion());
 
-    
+
     // LMIC init
     os_init();
     // Reset the MAC state. Session and pending data transfers will be discarded.
@@ -267,7 +267,7 @@ void setup() {
 }
 
 void loop() {
-    
+
     os_runloop_once();
     if(!lock)smartDelay(70);
     static double LAST_TX_LAT = 0, LAST_TX_LON = 0;
@@ -282,21 +282,21 @@ void loop() {
           (unsigned long)TinyGPSPlus::distanceBetween(
             gps.location.lat(),
             gps.location.lng(),
-            LAST_TX_LAT, 
+            LAST_TX_LAT,
             LAST_TX_LON);
           println("Last TX Distance " + String(lastTxDist) + "m");
-      
+
         double lastTxCourse =
           TinyGPSPlus::courseTo(
             gps.location.lat(),
             gps.location.lng(),
-            LAST_TX_LAT, 
+            LAST_TX_LAT,
             LAST_TX_LON);
-      
+
         //println( "Course: " + String(lastTxCourse));
-     
+
         const char *cardinalLastTx = TinyGPSPlus::cardinal(lastTxCourse);
-      
+
         //println("Cardinal " + String(cardinalLastTx));
         if(lastTxDist > TXdist ){
          #ifdef DOUBLE_SEND
@@ -306,7 +306,7 @@ void loop() {
          lpp.addGPS(0, float(gps.location.lat()), float(gps.location.lng()), gps.altitude.meters());
          lpp.addDigitalInput(1, uint8_t(lastTxDist));
          */
-          
+
           // variables for GPS data we want to transmit
           uint8_t hdop;
           uint16_t alt;
@@ -316,23 +316,23 @@ void loop() {
           txBuffer[0] = ( flat >> 16 ) & 0xFF;
           txBuffer[1] = ( flat >> 8 ) & 0xFF;
           txBuffer[2] = flat & 0xFF;
-      
+
           txBuffer[3] = ( flon >> 16 ) & 0xFF;
           txBuffer[4] = ( flon >> 8 ) & 0xFF;
           txBuffer[5] = flon & 0xFF;
-        
+
           alt = gps.altitude.meters();
           txBuffer[6] = ( alt >> 8 ) & 0xFF;
           txBuffer[7] = alt & 0xFF;
-        
+
           hdop = gps.hdop.hdop()/10;
           txBuffer[8] = hdop & 0xFF;
-         
+
          LAST_TX_LAT = gps.location.lat();
          LAST_TX_LON = gps.location.lng();
-         do_send(&sendjob); 
+         do_send(&sendjob);
         }
-            
+
     }
 }
 
@@ -341,7 +341,7 @@ void loop() {
 static void smartDelay(unsigned long ms)
 {
   unsigned long start = millis();
-  do 
+  do
   {
      #ifdef SOFT_SERIAL
       while (ss.available())

@@ -1,10 +1,10 @@
 # spGPStrack - LoRaWAN GPS Mapping
 
 This Program is a LoRaWAN GPS Tracker for mapping purposes
-It is developed for Arduino Uno and Dragion Lora/GPs Shield
+It is developed for Arduino Uno and Dragino Lora/GPs Shield
   - will transmit the location all x Meters
   - you can Choose the Payload Format between CayenneLPP and a Payload decoder Function
-  - the Software supports confirmed uplink and the Arduino will beep 
+  - the Software supports confirmed uplink and the Arduino will beep
   - You can read The GPS over Hardware Serial or Software Serial, so it's easier for development if you see what is going on during real operation
   - In case of Hardware Serial usage you can enable a Software Serial for debugging
 To get started just replace the LoRaWAN Keys!!!
@@ -17,7 +17,7 @@ Configuration:
   - DEBUG - If you use Hardware Serial you can enable DEBBUG, to get Debug outputon a Software Serial. Leave disabled to not use Software Serial at all
   - CAYENNELPP - If you want to use CayenneLPP as Payload Format otherwise use following Decoder Payload Function
 
- ## Payload Function 
+ ## Payload Function
  ```C
  function Decoder(bytes, port) {
   var decoded = {};
