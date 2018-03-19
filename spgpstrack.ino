@@ -1,13 +1,76 @@
+/*
+ * spGPStrack
+ * Author: Samuel Puschacher
+ * 
+ * Configuration:
+ *      TXdist - defines, the distance [in Meter], after which the position is sent
+ *      SF - Define The LoRaWAN Spreading Factor (DR_SF7 - DR_SF12) 7 and 8 recommended for Mapping
+ *      CONFIRMED - enables Confirmed uplinks, ONLY Enable, if you conncect a Buzzer to Pin D5! Otherwise this Feature is useless
+ *      SOFT_SERIAL - Uncomment to use Hardware Serial, Otherwise Software Serial is used. In that case connect the GPS Module to RXpin and TXpin
+ *      DEBUG - If you use Hardware Serial you can enable DEBBUG, to get Debug outputon a Software Serial. Leave disabled to not use Software Serial at all
+ *      CAYENNELPP - If you want to use CayenneLPP as Payload Format otherwise use following Decoder Payload Function
+ * Payload Decoder:
+
+  function Decoder(bytes, port) {
+  var decoded = {};
+  // if (port === 1) decoded.led = bytes[0];
+  decoded.latitude = ((bytes[0]<<16)>>>0) + ((bytes[1]<<8)>>>0) + bytes[2];
+  decoded.latitude = (decoded.latitude / 16777215.0 * 180) - 90;
+  decoded.longitude = ((bytes[3]<<16)>>>0) + ((bytes[4]<<8)>>>0) + bytes[5];
+  decoded.longitude= (decoded.longitude / 16777215.0 * 360) - 180;
+  var altValue = ((bytes[6]<<8)>>>0) + bytes[7];
+  var sign = bytes[6] & (1 << 7);
+  if(sign)
+  {
+    decoded.altitude = 0xFFFF0000 | altValue;
+  }
+  else
+  {
+    decoded.altitude = altValue;
+  }
+  decoded.hdop = bytes[8] / 10.0;
+  return decoded;
+}
+
+ * 
+ */
+
+/* TXdist in Meters */
 #define TXdist 100
-//#define DOUBLE_SEND
 
+/* Define Region */
 #define CFG_eu868
-#define CONFIRMED 0
+/* Define Data Rate aka Sporeading Factor */
+#define SF DR_SF7
+/* Single Channel Mode 
+ * Send only on Channel 0 
+ * To enable, Remove Comment ( // )
+ */
+//#define SINGLE_CHANNEL
 
+/* Confirmed Uplinks 
+ * Set Value to 1 to enable
+ * Set Value to 0 to disable
+ */ 
+#define CONFIRMED 0
+/* Software Serial Option
+ * Read GPS from Software Serial
+ * Uncomment to Enable
+ */
 //#define SOFT_SERIAL
+/* Set the IO Pins for the Software Serial */
+static const int RXPin = 4, TXPin = 3;
 #ifndef SOFT_SERIAL
+   /* If you use Software Serial you can enable Debug Output over Pin A2 */
   //#define DEBUG
 #endif
+
+/* Uncomment to use Cayenne LPP as Payload format*/
+//#define CAYENNELPP
+
+
+/********************** End of Configuration **********************/
+
 #include <lmic.h>
 #include <hal/hal.h>
 #include <SPI.h>
@@ -114,11 +177,13 @@ void onEvent (ev_t ev) {
         case EV_TXCOMPLETE:
             println(F("EV_TXCOMPLETE (includes waiting for RX windows)"));
             lock = false;
-            if (LMIC.txrxFlags & TXRX_ACK)
+            if (LMIC.txrxFlags & TXRX_ACK){
               println(F("Received ack"));
-              tone(buzzer, 3000); // Send 1KHz sound signal...
-              delay(500);        // ...for 1 sec
+              // Give acutic Signal
+              tone(buzzer, 3000); // Send 3KHz sound signal...
+              delay(500);
               noTone(buzzer);
+            }
             if (LMIC.dataLen) {
               println(F("Received "));
               println(String(LMIC.dataLen));
@@ -279,24 +344,24 @@ void setup() {
     LMIC.dn2Dr = DR_SF9;
 
     // Set data rate and transmit power for uplink (note: txpow seems to be ignored by the library)
-    LMIC_setDrTxpow(DR_SF8,14);
-
-    // Start job
-    //do_send(&sendjob);
+    LMIC_setDrTxpow(SF,14);
 }
 
 void loop() {
 
     os_runloop_once();
-    if(!lock)smartDelay(70);
+    // Don't check gps during LMIC sending
+    if(!lock){ smartDelay(70); }
     static double LAST_TX_LAT = 0, LAST_TX_LON = 0;
     static float LAST_COURSE = -1;
     static boolean doDouble = false;
-    //printFloat(gps.location.lat(), gps.location.isValid(), 11, 6);
-    //printFloat(gps.location.lng(), gps.location.isValid(), 12, 6);
-    //println(String(gps.sentencesWithFix()));
-    if(gps.location.isValid() && !lock){
-      //Serial.println(String(gps.sentencesWithFix()));
+    static unsigned int fix = 0;
+
+    // Check if transmission can Be done (GPS Fix and Precision)
+    if( gps.location.isValid() && gps.hdop.isValid() && gps.sentencesWithFix() > fix && gps.hdop.hdop() > 0 && gps.hdop.hdop() < 2 && !lock ){
+        // Set current GPS fix Count
+       fix = gps.sentencesWithFix();
+       // Measure Distance to Last Transmission Point
        unsigned long lastTxDist =
           (unsigned long)TinyGPSPlus::distanceBetween(
             gps.location.lat(),
@@ -304,7 +369,7 @@ void loop() {
             LAST_TX_LAT,
             LAST_TX_LON);
           println("Last TX Distance " + String(lastTxDist) + "m");
-
+        // Calculate Course to last transmission
         double lastTxCourse =
           TinyGPSPlus::courseTo(
             gps.location.lat(),
@@ -378,26 +443,4 @@ static void smartDelay(unsigned long ms)
     }
       //Serial.println(ss.read());
   } while (millis() - start < ms);
-}
-
-static void printFloat(float val, bool valid, int len, int prec)
-{
-  if (!valid)
-  {
-    while (len-- > 1)
-      print("*");
-      print(" ");
-  }
-  else
-  {
-    #ifdef SOFT_SERIAL
-    Serial.print(val, prec);
-    int vi = abs((int)val);
-    int flen = prec + (val < 0.0 ? 2 : 1); // . and -
-    flen += vi >= 1000 ? 4 : vi >= 100 ? 3 : vi >= 10 ? 2 : 1;
-    for (int i=flen; i<len; ++i)
-      Serial.print(' ');
-    #endif
-  }
-  smartDelay(0);
 }
