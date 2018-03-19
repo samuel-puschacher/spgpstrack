@@ -20,15 +20,10 @@
 #endif
 #endif
 
+#ifdef CAYENNELPP
+#include <CayenneLPP.h>
+#endif
 
-//#include <CayenneLPP.h>
-
-#define TXdist 100
-#define DOUBLE_SEND
-
-#define CFG_eu868
-#define CONFIRMED 1
-static const int RXPin = 4, TXPin = 3;
 static const uint32_t GPSBaud = 9600;
 
 // The TinyGPS++ object
@@ -42,10 +37,12 @@ SoftwareSerial ss(RXPin, TXPin);
     SoftwareSerial ds(A3, A2);
   #endif
 #endif
+
+#ifdef CAYENNELPP
+CayenneLPP lpp(20);
+#else
 uint8_t txBuffer[9];
-
-//CayenneLPP lpp(20);
-
+#endif
 // LoRaWAN NwkSKey, network session key
 // This is the default Semtech key, which is used by the early prototype TTN
 // network.
@@ -153,45 +150,67 @@ void onEvent (ev_t ev) {
 }
 
 void do_send(osjob_t* j){
+  #ifdef SINGLE_CHANNEL
+  for (int i = 1; i<=8; i++) LMIC_disableChannel(i);
+  #endif
     // Check if there is not a current TX/RX job running
     if (LMIC.opmode & OP_TXRXPEND) {
         println(F("OP_TXRXPEND, not sending"));
     } else {
       lock = true;
+
         // Prepare upstream data transmission at the next possible time.
-        //LMIC_setTxData2(3, lpp.getBuffer(), lpp.getSize(), confirmed);
+        #ifdef CAYENNELPP
+        // Set Transmission Data for CayenneLPP
+        LMIC_setTxData2(3, lpp.getBuffer(), lpp.getSize(), CONFIRMED);
+        #else
+        // Set Transmission Data for Payload Function
         LMIC_setTxData2(3, txBuffer, sizeof(txBuffer), CONFIRMED);
+        #endif
+        #if CONFIRMED
+        // No Retrys if no Confirmation, because we are moving
+        LMIC.txCnt = TXCONF_ATTEMPTS;
+        #endif
         println(F("Packet queued"));
     }
     // Next TX is scheduled after TX_COMPLETE event.
 }
+/* Println Function, which switches automaticaly between Hardware Serial / Software Serial / No debug output */
 void println(String s)
 {
   #ifdef SOFT_SERIAL
+  // Debug output on Hardware Serial
   Serial.println(s);
   #else
     #ifdef DEBUG
+      // Debug output on Software Serial
       ds.println(s);
     #endif
   #endif
 }
+/* Print Function, which switches automaticaly between Hardware Serial / Software Serial / No debug output */
 void print(String s)
 {
   #ifdef SOFT_SERIAL
+  // Debug output on Hardware Serial
   Serial.print(s);
-  #else
+  #else 
     #ifdef DEBUG
+      // Debug output on Software Serial
       ds.print(s);
     #endif
   #endif
 }
 void setup() {
     #ifdef SOFT_SERIAL
+    // Setup for Software Serial Option
     Serial.begin(115200);
     ss.begin(GPSBaud);
     #else
+    // Setup for Hardware Serial Option
     Serial.begin(GPSBaud);
       #ifdef DEBUG
+        // Setup Debug Serial
         ds.begin(115200);
       #endif
     #endif
@@ -295,19 +314,18 @@ void loop() {
 
         //println( "Course: " + String(lastTxCourse));
 
-        const char *cardinalLastTx = TinyGPSPlus::cardinal(lastTxCourse);
-
-        //println("Cardinal " + String(cardinalLastTx));
+        // If Distance to last TX Point is bigger than the TXdistance Prepare and Trigger Data Transmission
         if(lastTxDist > TXdist ){
          #ifdef DOUBLE_SEND
           doDouble!=doDouble;
          #endif
-         /*lpp.reset();
+         #ifdef CAYENNELPP
+         // Data Preperation for Cayenne LPP
+         lpp.reset();
          lpp.addGPS(0, float(gps.location.lat()), float(gps.location.lng()), gps.altitude.meters());
          lpp.addDigitalInput(1, uint8_t(lastTxDist));
-         */
-
-          // variables for GPS data we want to transmit
+         #else
+          // Data preperation for Payload Function
           uint8_t hdop;
           uint16_t alt;
           uint32_t flat, flon;
@@ -316,28 +334,29 @@ void loop() {
           txBuffer[0] = ( flat >> 16 ) & 0xFF;
           txBuffer[1] = ( flat >> 8 ) & 0xFF;
           txBuffer[2] = flat & 0xFF;
-
+      
           txBuffer[3] = ( flon >> 16 ) & 0xFF;
           txBuffer[4] = ( flon >> 8 ) & 0xFF;
           txBuffer[5] = flon & 0xFF;
-
+        
           alt = gps.altitude.meters();
           txBuffer[6] = ( alt >> 8 ) & 0xFF;
           txBuffer[7] = alt & 0xFF;
-
+        
           hdop = gps.hdop.hdop()/10;
           txBuffer[8] = hdop & 0xFF;
-
+          #endif
+         // Set Last TX Point to the Current Position
          LAST_TX_LAT = gps.location.lat();
          LAST_TX_LON = gps.location.lng();
+         //Do the send Function
          do_send(&sendjob);
         }
 
     }
 }
 
-// This custom version of delay() ensures that the gps object
-// is being "fed".
+// GPS Parsing Function
 static void smartDelay(unsigned long ms)
 {
   unsigned long start = millis();
