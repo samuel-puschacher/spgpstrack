@@ -106,18 +106,23 @@ CayenneLPP lpp(20);
 #else
 uint8_t txBuffer[9];
 #endif
-// LoRaWAN NwkSKey, network session key
+
+
+// ABP:
+
+// LoRaWAN end-device address (DevAddr, MSB)
+static const u4_t DEVADDR = 0x26000000 ; // <-- Change this address for every node!
+
+// LoRaWAN NwkSKey, network session key, MSB
 // This is the default Semtech key, which is used by the early prototype TTN
 // network.
 static const PROGMEM u1_t NWKSKEY[16] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 
-// LoRaWAN AppSKey, application session key
+// LoRaWAN AppSKey, application session key, MSB
 // This is the default Semtech key, which is used by the early prototype TTN
 // network.
 static const u1_t PROGMEM APPSKEY[16] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 
-// LoRaWAN end-device address (DevAddr)
-static const u4_t DEVADDR = 0x26000000 ; // <-- Change this address for every node!
 
 // These callbacks are only used in over-the-air activation, so they are
 // left empty here (we cannot leave them out completely unless
