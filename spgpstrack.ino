@@ -4,6 +4,11 @@
  * 
  * Configuration:
  *      TXdist - defines, the distance [in Meter], after which the position is sent
+ *      TXspeedModes - enable Speed Modes: You can transmit at different distances at different speeds
+ *      TXdistLOW - Transmit Interval distance in low speed mode
+ *      TXspeedLOW - Maximum speed for low speed mode
+ *      TXdistHIGH - Transmit Interval distance in high speed mode
+ *      TXspeedLOW - Minimum speed for high speed mode
  *      SF - Define The LoRaWAN Spreading Factor (DR_SF7 - DR_SF12) 7 and 8 recommended for Mapping
  *      CONFIRMED - enables Confirmed uplinks, ONLY Enable, if you conncect a Buzzer to Pin D5! Otherwise this Feature is useless
  *      SOFT_SERIAL - Uncomment to use Hardware Serial, Otherwise Software Serial is used. In that case connect the GPS Module to RXpin and TXpin
@@ -37,6 +42,18 @@
 
 /* TXdist in Meters */
 #define TXdist 100
+// Enable Speed modes
+#define TXspeedModes
+/* Low Speed Mode */
+// TX Distance in high speed mode; in meters
+#define TXdistLOW 50
+// max speed for high speed mode; in km/h
+#define TXspeedLOW 40
+/* High Speed Mode */
+// TX Distance in high speed mode; in meters
+#define TXdistHIGH 250
+// max speed for high speed mode; in km/h
+#define TXspeedHIGH 80
 
 /* Define Region */
 #define CFG_eu868
@@ -70,6 +87,11 @@ static const int RXPin = 4, TXPin = 3;
 
 
 /********************** End of Configuration **********************/
+
+#if TXspeedLOW >= TXspeedHIGH
+#error "Overlapping speeds"
+#endif
+
 
 #include <lmic.h>
 #include <hal/hal.h>
@@ -385,7 +407,16 @@ void loop() {
         //println( "Course: " + String(lastTxCourse));
 
         // If Distance to last TX Point is bigger than the TXdistance Prepare and Trigger Data Transmission
-        if(lastTxDist > TXdist ){
+        bool transmit = false;
+        #ifndef TXspeedModes
+          transmit = lastTxDist > TXdist; // No speed modes, Default TX distance
+        #else 
+         transmit =
+         ( (gps.speed.kmph() <= TXspeedLOW ) && (lastTxDist > TXdistLOW) ) || // Low speed mode Check
+         ( (gps.speed.kmph() >= TXspeedHIGH ) && (lastTxDist > TXdistHIGH) ) || //High speed mode chek
+        (lastTxDist > TXdist); // Default TX distance
+        #endif 
+        if( transmit ){
          #ifdef DOUBLE_SEND
           doDouble!=doDouble;
          #endif
