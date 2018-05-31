@@ -74,7 +74,7 @@
  * Read GPS from Software Serial
  * Uncomment to Enable
  */
-//#define SOFT_SERIAL
+#define SOFT_SERIAL
 /* Set the IO Pins for the Software Serial */
 static const int RXPin = 4, TXPin = 3;
 #ifndef SOFT_SERIAL
@@ -162,13 +162,21 @@ const unsigned TX_INTERVAL = 120;
 // Pin mapping Dragino Shield
 boolean lock = false;
 const int buzzer = 5; //buzzer to arduino pin 5
+#ifdef ESP_PLATFORM
+const lmic_pinmap lmic_pins = {
+    .nss = 5,
+    .rxtx = LMIC_UNUSED_PIN,
+    .rst = 13,
+    .dio = {26, 27, 14},
+};
+#else
 const lmic_pinmap lmic_pins = {
     .nss = 10,
     .rxtx = LMIC_UNUSED_PIN,
     .rst = 9,
     .dio = {2, 6, 7},
 };
-
+#endif
 
 void onEvent (ev_t ev) {
     print(String(os_getTime()));
@@ -207,9 +215,11 @@ void onEvent (ev_t ev) {
             if (LMIC.txrxFlags & TXRX_ACK){
               println(F("Received ack"));
               // Give acutic Signal
+              #ifndef ESP_PLATFORM
               tone(buzzer, 3000); // Send 3KHz sound signal...
               delay(500);
               noTone(buzzer);
+              #endif
             }
             if (LMIC.dataLen) {
               println(F("Received "));
