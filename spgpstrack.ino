@@ -45,9 +45,9 @@
 // Enable Speed modes
 #define TXspeedModes
 /* Low Speed Mode */
-// TX Distance in high speed mode; in meters
+// TX Distance in low speed mode; in meters
 #define TXdistLOW 50
-// max speed for high speed mode; in km/h
+// max speed for low speed mode; in km/h
 #define TXspeedLOW 40
 /* High Speed Mode */
 // TX Distance in high speed mode; in meters
