@@ -52,7 +52,7 @@
 /* High Speed Mode */
 // TX Distance in high speed mode; in meters
 #define TXdistHIGH 250
-// max speed for high speed mode; in km/h
+// min speed for high speed mode; in km/h
 #define TXspeedHIGH 80
 
 /* Define Region */
