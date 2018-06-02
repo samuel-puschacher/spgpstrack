@@ -8,6 +8,10 @@ It is developed for Arduino Uno and Dragino Lora/GPS Shield
   - the software supports confirmed uplink and the Arduino will beep
   - You can read the GPS over Hardware Serial or Software Serial, so it's easier for development if you see what is going on during real operation
   - In case of Hardware Serial usage you can enable a Software Serial for debugging
+ ## To Do
+  - Timed transmission, which also executes when the tracker is not moving. For example every hour, to see if the tracker is still alive.
+  - low power option
+  - ESP32 support [State: in work, see branch develop. The SPI Config produces backtraces] Hardware: ESP32 Uno, branded as Wemos
 
  ## Quick Start
   - In the TTN Console, create an Application, register a new device (as ABP)
