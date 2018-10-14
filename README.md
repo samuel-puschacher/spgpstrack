@@ -1,7 +1,7 @@
 # spGPStrack - LoRaWAN GPS Mapping
 
 This program is a LoRaWAN GPS Tracker for mapping purposes
-It is developed for Arduino Uno and Dragino Lora/GPS Shield
+It is developed for Arduino Uno with Dragino Lora/GPS Shield and for ESP32 TTGO T-Beam (tested with T22_V07)
   - configured as ABP so that you can power up the device at locations where you do not have coverage
   - will transmit the location all x meters
   - you can choose the payload format between CayenneLPP and a manual Payload Decoder Function
@@ -11,7 +11,8 @@ It is developed for Arduino Uno and Dragino Lora/GPS Shield
  ## To Do
   - Timed transmission, which also executes when the tracker is not moving. For example every hour, to see if the tracker is still alive.
   - low power option
-  - ESP32 support [State: in work, see branch develop. The SPI Config produces backtraces] Hardware: ESP32 Uno, branded as Wemos
+  - ~~ESP32 support [State: in work, see branch develop. The SPI Config produces backtraces] Hardware: ESP32 Uno, branded as Wemos~~ ESP32 already implemented fot TTGO T-Beam
+  - Alternative WiFi Position for ESP32
 
  ## Quick Start
   - In the TTN Console, create an Application, register a new device (as ABP)
@@ -24,6 +25,22 @@ It is developed for Arduino Uno and Dragino Lora/GPS Shield
   (or you will disclose your home location with a cloud of successfull connect dots)
   - You should find your new Experiment at the end of [this list](https://ttnmapper.org/experiments/list_all.php).
 
+ ## ESP32
+For T22_07 
+SPI Pin Setting Not Implemented in LMIC yet! -> https://github.com/matthijskooijman/arduino-lmic/issues/164
+
+-> Change the SPI Pins directly in the library
+
+**Attention!!! Don't forget to reset this, if you are using also other Hardware with LMIC**
+
+**hal.cpp** Line 79
+```C
+ static void hal_spi_init () {
+   //SPI.begin();
+   SPI.begin(5,19,27);
+}
+```
+ 
  ## Dependencies
   - [Arduino LMIC](https://github.com/matthijskooijman/arduino-lmic)
   - [TinyGPS++](http://arduiniana.org/libraries/tinygpsplus/)
@@ -39,7 +56,7 @@ It is developed for Arduino Uno and Dragino Lora/GPS Shield
   - CAYENNELPP - If you want to use CayenneLPP as Payload Format otherwise use following Decoder Payload Function
 
  ## Payload Function
- ```C
+ ```javascript
  function Decoder(bytes, port) {
   var decoded = {};
   // if (port === 1) decoded.led = bytes[0];

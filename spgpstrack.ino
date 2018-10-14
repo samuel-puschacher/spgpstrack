@@ -76,7 +76,14 @@
  */
 //#define SOFT_SERIAL
 /* Set the IO Pins for the Software Serial */
+#ifdef __AVR__
 static const int RXPin = 4, TXPin = 3;
+#endif
+#ifdef ESP32
+  #define BUILTIN_LED 21
+  static const int RXPin = 12, TXPin = 13;
+  HardwareSerial ESP_Serial(1);
+#endif
 #ifndef SOFT_SERIAL
    /* If you use Software Serial you can enable Debug Output over Pin A2 */
   //#define DEBUG
@@ -95,14 +102,21 @@ static const int RXPin = 4, TXPin = 3;
 
 #include <lmic.h>
 #include <hal/hal.h>
-#include <SPI.h>
-#include <TinyGPS++.h>
-#ifdef SOFT_SERIAL
-#include <SoftwareSerial.h>
-#else
-#ifdef DEBUG
-#include <SoftwareSerial.h>
+#ifdef __AVR__
+  #include <SPI.h>
 #endif
+#ifdef ESP32
+  #include <WiFi.h>
+#endif
+
+#include <TinyGPS++.h>
+
+#ifdef SOFT_SERIAL
+  #include <SoftwareSerial.h>
+#else
+  #ifdef DEBUG
+    #include <SoftwareSerial.h>
+  #endif
 #endif
 
 #ifdef CAYENNELPP
@@ -162,12 +176,37 @@ const unsigned TX_INTERVAL = 120;
 // Pin mapping Dragino Shield
 boolean lock = false;
 const int buzzer = 5; //buzzer to arduino pin 5
+
+#ifdef __AVR__
 const lmic_pinmap lmic_pins = {
     .nss = 10,
     .rxtx = LMIC_UNUSED_PIN,
     .rst = 9,
     .dio = {2, 6, 7},
 };
+#endif
+#ifdef ESP32
+//Pin Mapping for TTGO T-BEAM
+const lmic_pinmap lmic_pins = {
+    //.mosi = GPIO_NUM_27,
+    //.miso = GPIO_NUM_19,
+    //.sck = GPIO_NUM_5,
+    /* For T22_07 
+     * SPI Pin Setting Not Implemented in LMIC yet! -> https://github.com/matthijskooijman/arduino-lmic/issues/164
+     * Change the SPI Pins directly in the library
+     * hal.cpp Line 79
+     * static void hal_spi_init () {
+     *   //SPI.begin();
+     *   SPI.begin(5,19,27);
+     * }
+     */
+  .nss = 18,
+  .rxtx = LMIC_UNUSED_PIN,
+  .rst = LMIC_UNUSED_PIN,
+  .dio = {26, 33, 32},
+};
+
+#endif
 
 
 void onEvent (ev_t ev) {
@@ -207,9 +246,11 @@ void onEvent (ev_t ev) {
             if (LMIC.txrxFlags & TXRX_ACK){
               println(F("Received ack"));
               // Give acutic Signal
+              #ifdef __AVR__
               tone(buzzer, 3000); // Send 3KHz sound signal...
               delay(500);
               noTone(buzzer);
+              #endif
             }
             if (LMIC.dataLen) {
               println(F("Received "));
@@ -270,40 +311,54 @@ void do_send(osjob_t* j){
 /* Println Function, which switches automaticaly between Hardware Serial / Software Serial / No debug output */
 void println(String s)
 {
-  #ifdef SOFT_SERIAL
-  // Debug output on Hardware Serial
-  Serial.println(s);
+  #ifdef ESP32
+    Serial.println(s);
   #else
-    #ifdef DEBUG
-      // Debug output on Software Serial
-      ds.println(s);
+    #ifdef SOFT_SERIAL
+    // Debug output on Hardware Serial
+    Serial.println(s);
+    #else
+      #ifdef DEBUG
+        // Debug output on Software Serial
+        ds.println(s);
+      #endif
     #endif
   #endif
 }
 /* Print Function, which switches automaticaly between Hardware Serial / Software Serial / No debug output */
 void print(String s)
 {
-  #ifdef SOFT_SERIAL
-  // Debug output on Hardware Serial
-  Serial.print(s);
-  #else 
-    #ifdef DEBUG
-      // Debug output on Software Serial
-      ds.print(s);
+  #ifdef ESP32
+    Serial.println(s);
+  #else
+    #ifdef SOFT_SERIAL
+    // Debug output on Hardware Serial
+    Serial.print(s);
+    #else 
+      #ifdef DEBUG
+        // Debug output on Software Serial
+        ds.print(s);
+      #endif
     #endif
   #endif
 }
 void setup() {
-    #ifdef SOFT_SERIAL
-    // Setup for Software Serial Option
-    Serial.begin(115200);
-    ss.begin(GPSBaud);
+    #ifdef ESP32
+      Serial.begin(115200);
+      ESP_Serial.begin(GPSBaud, SERIAL_8N1, RXPin, TXPin);
+      ESP_Serial.setTimeout(2);  
     #else
-    // Setup for Hardware Serial Option
-    Serial.begin(GPSBaud);
-      #ifdef DEBUG
-        // Setup Debug Serial
-        ds.begin(115200);
+      #ifdef SOFT_SERIAL
+      // Setup for Software Serial Option
+      Serial.begin(115200);
+      ss.begin(GPSBaud);
+      #else
+      // Setup for Hardware Serial Option
+      Serial.begin(GPSBaud);
+        #ifdef DEBUG
+          // Setup Debug Serial
+          ds.begin(115200);
+        #endif
       #endif
     #endif
     println(F("Starting"));
@@ -372,6 +427,7 @@ void setup() {
 
     // Set data rate and transmit power for uplink (note: txpow seems to be ignored by the library)
     LMIC_setDrTxpow(SF,14);
+    println("Setup OK");
 }
 
 void loop() {
@@ -383,9 +439,10 @@ void loop() {
     static float LAST_COURSE = -1;
     static boolean doDouble = false;
     static unsigned int fix = 0;
-
+    //if(gps.hdop.hdop()<3)printf("FIX");
     // Check if transmission can Be done (GPS Fix and Precision)
     if( gps.location.isValid() && gps.hdop.isValid() && gps.sentencesWithFix() > fix && gps.hdop.hdop() > 0 && gps.hdop.hdop() < 2 && !lock ){
+        printf("Valid GPS");
         // Set current GPS fix Count
        fix = gps.sentencesWithFix();
        // Measure Distance to Last Transmission Point
@@ -444,7 +501,7 @@ void loop() {
           txBuffer[6] = ( alt >> 8 ) & 0xFF;
           txBuffer[7] = alt & 0xFF;
         
-          hdop = gps.hdop.hdop()/10;
+          hdop = gps.hdop.hdop()*10;
           txBuffer[8] = hdop & 0xFF;
           #endif
          // Set Last TX Point to the Current Position
@@ -455,6 +512,13 @@ void loop() {
         }
 
     }
+    else {
+        // Get Alternative Position
+        #ifdef ESP32
+
+
+        #endif
+    }
 }
 
 // GPS Parsing Function
@@ -463,18 +527,26 @@ static void smartDelay(unsigned long ms)
   unsigned long start = millis();
   do
   {
-     #ifdef SOFT_SERIAL
-      while (ss.available())
+     #ifdef ESP32
+      while (ESP_Serial.available())
      #else
-      while (Serial.available())
+       #ifdef SOFT_SERIAL
+        while (ss.available())
+       #else
+        while (Serial.available())
+       #endif
      #endif
     {
-
-    #ifdef SOFT_SERIAL
-      gps.encode(ss.read());
-     #else
-      gps.encode(Serial.read());
-      //ds.println("a " + Serial.read());
+    #ifdef ESP32
+    //println("GPS");
+        gps.encode(ESP_Serial.read());
+    #else
+      #ifdef SOFT_SERIAL
+        gps.encode(ss.read());
+       #else
+        gps.encode(Serial.read());
+        //ds.println("a " + Serial.read());
+       #endif
      #endif
     }
       //Serial.println(ss.read());
