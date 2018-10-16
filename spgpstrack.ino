@@ -106,6 +106,8 @@ static const int RXPin = 4, TXPin = 3;
   #include <SPI.h>
 #endif
 #ifdef ESP32
+  #include <Ticker.h>
+  Ticker tickerSampleGPS;
   #include <WiFi.h>
 #endif
 
@@ -347,6 +349,7 @@ void setup() {
       Serial.begin(115200);
       ESP_Serial.begin(GPSBaud, SERIAL_8N1, RXPin, TXPin);
       ESP_Serial.setTimeout(2);  
+      tickerSampleGPS.attach_ms(500, sampleGPS);
     #else
       #ifdef SOFT_SERIAL
       // Setup for Software Serial Option
@@ -434,14 +437,17 @@ void loop() {
 
     os_runloop_once();
     // Don't check gps during LMIC sending
-    if(!lock){ smartDelay(70); }
+    if(!lock){ 
+      #ifndef ESP32
+        smartDelay(70);
+      #endif
+      }
     static double LAST_TX_LAT = 0, LAST_TX_LON = 0;
     static float LAST_COURSE = -1;
     static boolean doDouble = false;
     static unsigned int fix = 0;
-    //if(gps.hdop.hdop()<3)printf("FIX");
     // Check if transmission can Be done (GPS Fix and Precision)
-    if( gps.location.isValid() && gps.hdop.isValid() && gps.sentencesWithFix() > fix && gps.hdop.hdop() > 0 && gps.hdop.hdop() < 2 && !lock ){
+    if( gps.location.isValid() && gps.hdop.isValid() && gps.sentencesWithFix() > fix && gps.hdop.hdop() > 0 && gps.hdop.hdop() < 5 && !lock ){
         printf("Valid GPS");
         // Set current GPS fix Count
        fix = gps.sentencesWithFix();
@@ -522,12 +528,8 @@ void loop() {
 }
 
 // GPS Parsing Function
-static void smartDelay(unsigned long ms)
-{
-  unsigned long start = millis();
-  do
-  {
-     #ifdef ESP32
+static void sampleGPS(){
+  #ifdef ESP32
       while (ESP_Serial.available())
      #else
        #ifdef SOFT_SERIAL
@@ -550,5 +552,13 @@ static void smartDelay(unsigned long ms)
      #endif
     }
       //Serial.println(ss.read());
+  
+}
+static void smartDelay(unsigned long ms)
+{
+  unsigned long start = millis();
+  do
+  {
+     sampleGPS();
   } while (millis() - start < ms);
 }
